@@ -93,11 +93,35 @@ upstream {{ $host }} {
 
 {{ if (and (ne $cert "") (exists (printf "/etc/nginx/certs/%s.crt" $cert)) (exists (printf "/etc/nginx/certs/%s.key" $cert))) }}
 
+
 server {
 	server_name {{ $host }};
 	listen 80 {{ $default_server }};
+	
+	
+	# TODO: same as :80 block below. use jinja partial / nginx upstream
+	
+	{{ if ENV_VAR_FORCE_SSL is not defined or not ENV_VAR_FORCE_SSL }}
+	
 	return 301 https://$host$request_uri;
+	
+	{{ else }}
+	
+	{{ if (exists (printf "/etc/nginx/vhost.d/%s" $host)) }}
+	include {{ printf "/etc/nginx/vhost.d/%s" $host }};
+	{{ end }}
+
+	location / {
+		proxy_pass {{ $proto }}://{{ $host }};
+		{{ if (exists (printf "/etc/nginx/htpasswd/%s" $host)) }}
+		auth_basic	"Restricted {{ $host }}";
+		auth_basic_user_file	{{ (printf "/etc/nginx/htpasswd/%s" $host) }};
+		{{ end }}
+	}
+	
+	{{ end }}
 }
+
 
 server {
 	server_name {{ $host }};
@@ -133,6 +157,9 @@ server {
 }
 {{ else }}
 
+#
+# TODO: use a jinja partial for :80 block, or nginx conf convention
+#
 server {
 	server_name {{ $host }};
 	listen 80 {{ $default_server }};
